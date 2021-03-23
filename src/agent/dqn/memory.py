@@ -73,8 +73,8 @@ class LazyMemory(dict):
 
     def _append(self, state, action, reward, next_state, done):
         if state.device.type == 'cuda':
-            state = np.array(state.cpu() * 255, dtype=np.int32)
-            next_state = np.array(next_state.cpu() * 255, dtype=np.int32)
+            state = np.array(state.cpu() * 255, dtype=np.uint8)
+            next_state = np.array(next_state.cpu() * 255, dtype=np.uint8)
         self['state'].append(state)
         self['next_state'].append(next_state)
         self['action'][self._p] = action

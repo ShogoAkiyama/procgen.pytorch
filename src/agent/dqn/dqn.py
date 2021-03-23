@@ -16,7 +16,7 @@ class DQN:
                  num_steps=5*(10**7), epsilon_decay_steps=25*(10**4),
                  start_steps=5*(10**4), max_episode_steps=27*(10**3),
                  lr=2.5e-4, adam_eps=1.e-5, epsilon_train=0.01, epsilon_eval=0.001,
-                 memory_size=10**6, batch_size=32, gamma=0.99, multi_step=1):
+                 memory_size=10**6, batch_size=32, gamma=0.99, multi_step=1, double_q=False):
 
         self.envs = envs
         self.eval_envs = eval_envs
@@ -60,7 +60,7 @@ class DQN:
             memory_size, batch_size, self.envs.observation_space.shape,
             self.device, gamma, multi_step)
 
-        self.double_q = False
+        self.double_q = double_q
         self.steps = 0
         self.best_eval_score = -np.inf
         self.episode_rewards = deque(maxlen=10)
@@ -77,7 +77,7 @@ class DQN:
                 if self.is_random(eval=False):
                     action = self.envs.action_space.sample()
                 else:
-                    action = self.exploit(state)
+                    action, _ = self.exploit(state)
 
                 next_state, reward, done, _ = self.envs.step(action)
 
@@ -126,14 +126,18 @@ class DQN:
 
         loss = torch.mean((target_q - curr_q) ** 2)
 
+        self.writer.add_scalar(
+            'train/loss', loss.item(), self.steps)
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
     def exploit(self, state):
         with torch.no_grad():
-            action = self.network.calculate_q(states=state).argmax().item()
-        return action
+            q_value = self.network.calculate_q(states=state)
+            action = q_value.argmax().item()
+        return action, q_value[:, action].item()
 
     def is_random(self, eval=False):
         if self.steps < self.start_steps:
@@ -146,7 +150,8 @@ class DQN:
         self.network.eval()
         num_episodes = 0
         num_steps = 0
-        total_rewards = 0.0
+        total_rewards = 0.
+        total_q = 0.
         eval_episodes = 10
 
         for _ in range(eval_episodes):
@@ -158,12 +163,13 @@ class DQN:
                 if self.is_random(eval=True):
                     action = self.envs.action_space.sample()
                 else:
-                    action = self.exploit(state)
+                    action, q_value = self.exploit(state)
 
                 next_state, reward, done, _ = self.eval_envs.step(action)
                 num_steps += 1
                 episode_steps += 1
                 episode_rewards += reward.item()
+                total_q += q_value
                 done = done.item() == 1
                 state = next_state
 
@@ -171,6 +177,7 @@ class DQN:
             total_rewards += episode_rewards
 
         avg_reward = total_rewards / num_episodes
+        avg_q = total_q / num_steps
 
         if avg_reward > self.best_eval_score:
             self.best_eval_score = avg_reward
@@ -182,7 +189,9 @@ class DQN:
 
         # We log evaluation results along with training frames = 4 * steps.
         self.writer.add_scalar(
-            'return/test', avg_reward, 4 * self.steps)
+            'eval/return', avg_reward, self.steps)
+        self.writer.add_scalar(
+            'eval/Estimate Q', avg_q, self.steps)
 
     def log(self):
         if len(self.episode_rewards) > 1:
@@ -190,8 +199,7 @@ class DQN:
                   f"Mean Return: {np.mean(self.episode_rewards):.3f}",
                   end='')
             self.writer.add_scalar(
-                'return/train', np.mean(self.episode_rewards),
-                4 * self.steps)
+                'train/return', np.mean(self.episode_rewards), self.steps)
 
     def save_model(self, filename):
         torch.save(

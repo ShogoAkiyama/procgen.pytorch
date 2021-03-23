@@ -1,5 +1,20 @@
-## DQN parameter ##
+## DQN ##
+## interval ##
 num_steps: 10000000
 eval_steps: 50000
-lr: 2.5e-4
+start_steps: 50000
+target_update_steps: 10000
+update_steps: 4
+## DQN parameter ##
+batch_size: 32
+lr: 5.e-5
 adam_eps: 1.e-5
+gamma: 0.99
+multi_step: 1
+## epsilon ##
+epsilon_train: 0.01
+epsilon_eval: 0.001
+epsilon_decay_steps: 250000
+## etc ##
+memory_size: 1000000
+double_q: False
