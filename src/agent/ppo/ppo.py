@@ -170,7 +170,8 @@ class PPO:
             total_steps = (step + 1) * self.num_processes * self.rollout_length
             print(f"\rSteps: {total_steps}   "
                   f"Updates: {step}   "
-                  f"Mean Return: {np.mean(self.episode_rewards)}")
+                  f"Mean Return: {np.mean(self.episode_rewards)}",
+                  end='')
             self.writer.add_scalar(
                 'return/train', np.mean(self.episode_rewards),
                 total_steps)

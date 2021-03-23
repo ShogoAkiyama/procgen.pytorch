@@ -9,7 +9,8 @@ from src.envs.envs import make_env
 from src.agent import *
 
 AGENT_CLASS = {
-    'ppo': (PPO, 'ppo,yaml')
+    'ppo': (PPO, 'ppo,yaml'),
+    'dqn': (DQN, 'dqn,yaml'),
 }
 
 
@@ -42,19 +43,19 @@ def train(args):
 
     # run
     agent(envs, eval_envs, device, log_dir, args.num_processes,
-          **agent_config).run().save_model(filename='final_model.pth')
+          **agent_config).run()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--log_dir', default='logs')
-    parser.add_argument('--agent', type=str, default='ppo')
+    parser.add_argument('--agent', type=str, default='dqn')
     parser.add_argument('--cuda', action='store_true')
 
     # Procgen Argments
     parser.add_argument('--env_name', type=str, default='coinrun')
-    parser.add_argument('--num_processes', type=int, default=64)
+    parser.add_argument('--num_processes', type=int, default=1)
 
     args = parser.parse_args()
 

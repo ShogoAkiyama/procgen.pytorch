@@ -1,4 +1,5 @@
 import time
+from numbers import Number
 import torch
 import numpy as np
 from collections import deque
@@ -146,10 +147,12 @@ class VecPyTorchProcgen(VecEnvWrapper):
         return obs
 
     def step_async(self, actions):
-        if isinstance(actions, torch.LongTensor) or len(actions.shape) > 1:
+        if isinstance(actions, Number):
+            actions = np.array([actions])
+        elif isinstance(actions, torch.LongTensor) or len(actions.shape) > 1:
             # Squeeze the dimension for discrete actions
             actions = actions.squeeze(1)
-        actions = actions.cpu().numpy()
+            actions = actions.cpu().numpy()
         self.venv.step_async(actions)
 
     def step_wait(self):
