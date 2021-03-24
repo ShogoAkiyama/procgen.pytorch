@@ -8,14 +8,15 @@ from torch.utils.tensorboard import SummaryWriter
 
 from .network import PPONetwork
 from .storage import RolloutStorage
+from .utils import aug_to_func
 
 
-class PPO:
+class DRAC:
     def __init__(self, envs, eval_envs, device, log_dir, num_processes, eval_steps=10**4,
                  num_steps=10**6, batch_size=256, rollout_length=128, lr=2.5e-4,
-                 adam_eps=1e-5, gamma=0.99, clip_param=0.1,
-                 num_gradient_steps=4, value_loss_coef=0.5, entropy_coef=0.01,
-                 lambd=0.95, max_grad_norm=0.5):
+                 adam_eps=1e-5, gamma=0.99, clip_param=0.1, num_gradient_steps=4,
+                 value_coef=0.5, entropy_coef=0.01, lambd=0.95, max_grad_norm=0.5,
+                 aug_type='crop', aug_coef=0.1):
 
         self.envs = envs
         self.eval_envs = eval_envs
@@ -31,7 +32,7 @@ class PPO:
         self.gamma = gamma
         self.clip_param = clip_param
         self.num_gradient_steps = num_gradient_steps
-        self.value_loss_coef = value_loss_coef
+        self.value_coef = value_coef
         self.entropy_coef = entropy_coef
         self.lambd = lambd
         self.max_grad_norm = max_grad_norm
@@ -61,6 +62,9 @@ class PPO:
             self.network.parameters(), lr=lr, eps=adam_eps)
 
         self.episode_rewards = deque(maxlen=10)
+
+        self.aug_func = aug_to_func[aug_type](batch_size=batch_size)
+        self.aug_coef = aug_coef
 
     def run(self):
         states = self.envs.reset()
@@ -121,11 +125,21 @@ class PPO:
                 (value_pred_clipped - target_values).pow(2)
             ).mean()
 
+            aug_states = self.aug_func.do_augmentation(states)
+            _, new_actions, _ = self.network(states)
+            aug_values, aug_action_log_probs, aug_dist_entropy = \
+                self.network.evaluate_action(aug_states, new_actions)
+
+            aug_loss_policy = - aug_action_log_probs.mean()
+            aug_loss_value = 0.5 * (
+                    values.detach() - aug_values).pow(2).mean()
+
             self.optimizer.zero_grad()
             loss = (
                 loss_policy
-                + self.value_loss_coef * loss_value
+                + self.value_coef * loss_value
                 - self.entropy_coef * dist_entropy
+                + self.aug_coef * (aug_loss_value + aug_loss_policy)
             )
 
             loss.backward()
@@ -133,6 +147,9 @@ class PPO:
                 self.network.parameters(), self.max_grad_norm
             )
             self.optimizer.step()
+
+            if self.aug_func:
+                self.aug_func.change_randomization_params_all()
 
     def evaluate(self, step):
         if step % self.eval_steps == 0:

@@ -8,7 +8,10 @@ adam_eps: 1.e-5
 gamma: 0.99
 clip_param: 0.1
 num_gradient_steps: 4
-value_loss_coef: 0.5
+value_coef: 0.5
 entropy_coef: 0.01
 lambd: 0.95
 max_grad_norm: 0.5
+
+aug_type: 'crop'
+aug_coef: 0.1
