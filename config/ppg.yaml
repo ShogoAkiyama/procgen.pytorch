@@ -1,0 +1,18 @@
+## PPO parameter ##
+num_steps: 100000000
+eval_steps: 10
+batch_size: 8
+rollout_length: 256
+lr: 5.e-4
+adam_eps: 1.e-5
+gamma: 0.999
+clip_param: 0.2
+epochs: 1
+entropy_coef: 0.01
+lambd: 0.95
+max_grad_norm: 0.5
+
+## aux parameter ##
+aux_steps: 32
+aux_batch_size: 16
+aux_epochs: 6

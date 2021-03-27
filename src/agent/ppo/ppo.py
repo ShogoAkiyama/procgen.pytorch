@@ -108,7 +108,7 @@ class PPO:
 
             ratio = torch.exp(action_log_probs - log_probs_old)
 
-            loss_policy = -torch.min(ratio * advs, torch.clamp(
+            loss_policy = torch.min(ratio * advs, torch.clamp(
                 ratio, 1.0-self.clip_param, 1.0+self.clip_param) * advs
             ).mean()
 
@@ -123,7 +123,7 @@ class PPO:
 
             self.optimizer.zero_grad()
             loss = (
-                loss_policy
+                - loss_policy
                 + self.value_loss_coef * loss_value
                 - self.entropy_coef * dist_entropy
             )

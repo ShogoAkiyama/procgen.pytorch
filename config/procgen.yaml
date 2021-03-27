@@ -1,4 +1,4 @@
 ## procgen paramter ##
 start_level: 0
-num_levels: 200
+num_levels: 0
 distribution_mode: 'hard'

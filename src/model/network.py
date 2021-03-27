@@ -67,9 +67,15 @@ class Categorical(nn.Module):
     def __init__(self, num_inputs, num_outputs):
         super(Categorical, self).__init__()
 
-        self.linear = nn.Linear(num_inputs, num_outputs).apply(
-            partial(init_fn, gain=0.01))
+        self.linear = nn.Linear(num_inputs, num_outputs).apply(initialize_xavier)
 
     def forward(self, x):
         x = self.linear(x)
         return FixedCategorical(logits=x)
+
+
+def initialize_xavier(m, gain=1.0):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight, gain=gain)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
