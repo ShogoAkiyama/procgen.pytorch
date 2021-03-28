@@ -1,14 +1,18 @@
 ## PPO parameter ##
-num_steps: 10000000
+num_steps: 100000000
 eval_steps: 10
-batch_size: 256
-rollout_length: 128
-lr: 2.5e-4
+batch_size: 8
+rollout_length: 256
+lr: 5.e-4
 adam_eps: 1.e-5
-gamma: 0.99
-clip_param: 0.1
-num_gradient_steps: 4
-value_loss_coef: 0.5
+gamma: 0.999
+clip_param: 0.2
+epochs: 1
 entropy_coef: 0.01
 lambd: 0.95
 max_grad_norm: 0.5
+value_coef: 0.5
+
+use_drac: True
+aug_type: 'crop'
+aug_coef: 0.1

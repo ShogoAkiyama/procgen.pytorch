@@ -7,7 +7,7 @@ class PPONetwork(nn.Module):
     def __init__(self, obs_shape, action_space):
         super().__init__()
         self.base = ImpalaCNNBody(obs_shape[0])
-        self.dist = Categorical(self.base.output_size, action_space.n)
+        self.dist = Categorical(self.base.output_size, action_space)
         self.critic_linear = nn.Linear(self.base.output_size, 1)
 
     def forward(self, states, determistic=False):

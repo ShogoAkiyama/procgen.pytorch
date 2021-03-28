@@ -11,7 +11,6 @@ from src.agent import *
 AGENT_CLASS = {
     'ppo': (PPO, 'ppo,yaml'),
     'dqn': (DQN, 'dqn,yaml'),
-    'drac': (DRAC, 'drac,yaml'),
     'ppg': (PPG, 'ppg,yaml'),
 }
 
@@ -52,7 +51,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--log_dir', default='logs')
-    parser.add_argument('--agent', type=str, default='ppg')
+    parser.add_argument('--agent', type=str, default='ppo')
     parser.add_argument('--cuda', action='store_true')
 
     # Procgen Argments

@@ -125,7 +125,6 @@ class PPG:
         self.storage.end_rolout(next_values)
 
     def update(self):
-
         for sample in self.storage.iterate():
             self.policy_update(sample)
             self.value_update(sample)
