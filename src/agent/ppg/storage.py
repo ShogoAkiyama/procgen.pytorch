@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
+from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler, SequentialSampler
 
 
 class RolloutStorage:
@@ -103,27 +103,23 @@ class Memory:
         self.batch_size = batch_size
         self.device = device
         self.state_shape = state_shape
+        self.action_shape = action_shape
 
         self.reset()
 
     def reset(self):
-        self.states = torch.zeros((self.memory_size, *self.state_shape))
-        self.target_values = torch.zeros((self.memory_size, 1))
-        self.pi_old = torch.zeros((self.memory_size, 1))
-        self.pred_values = torch.zeros((self.memory_size, 1))
+        self.states = np.empty((self.memory_size, *self.state_shape), dtype=np.uint8)
+        self.target_values = np.empty((self.memory_size, 1), dtype=np.float32)
+        self.pi_old = np.empty((self.memory_size, self.action_shape), dtype=np.float32)
+        self.pred_values = np.empty((self.memory_size, 1), dtype=np.float32)
 
         self.p = 0
         self.q = 0
 
     def append(self, states, target_values, pred_values):
-        if states.device.type == 'cuda':
-            states = states.cpu()
-            target_values = target_values.cpu()
-            pred_values = pred_values.cpu()
-        # for i in range((len(states))):
-        self.states[self.p:self.p+len(states)] = states
-        self.target_values[self.p:self.p+len(target_values)] = target_values
-        self.pred_values[self.p:self.p+len(pred_values)] = pred_values
+        self.states[self.p:self.p+len(states)] = np.array(states.cpu() * 255, dtype=np.uint8)
+        self.target_values[self.p:self.p+len(target_values)] = target_values.cpu().numpy()
+        self.pred_values[self.p:self.p+len(pred_values)] = pred_values.cpu().numpy()
         self.p += len(states)
         # print(self.p, '/', self.memory_size)
 
@@ -137,14 +133,23 @@ class Memory:
         for _ in range(self.epochs):
             # Sampler for indices.
             sampler = BatchSampler(
-                SubsetRandomSampler(range(len(self.states))), self.batch_size, drop_last=True)
+                SubsetRandomSampler(range(len(self.states))),
+                self.batch_size, drop_last=True)
 
             for indices in sampler:
-                states = self.states[indices].to(self.device)
-                target_values = self.target_values[indices].to(self.device)
-                pi_old = self.pi_old[indices].to(self.device)
-
-                pred_values = self.pred_values[indices].to(self.device)
+                states = torch.ByteTensor(self.states[indices]).to(self.device).float() / 255.
+                target_values = torch.FloatTensor(self.target_values[indices]).to(self.device)
+                pi_old = torch.FloatTensor(self.pi_old[indices]).to(self.device)
+                pred_values = torch.FloatTensor(self.pred_values[indices]).to(self.device)
 
                 yield states, target_values, pi_old, pred_values
-                # yield states, target_values, pred_values
+
+    def state_iterate(self):
+        sampler = BatchSampler(
+            SequentialSampler(range(len(self.states))),
+            128, drop_last=False)
+
+        for indices in sampler:
+            states = torch.ByteTensor(self.states[indices]).to(self.device).float() / 255.
+
+            yield states

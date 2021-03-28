@@ -43,9 +43,15 @@ class PPG:
         memory_size = aux_steps * num_processes * rollout_length
         self.aux_steps = aux_steps
 
+        self.memory_size = memory_size
         self.memory = Memory(memory_size, aux_batch_size,
                              aux_epochs, self.state_shape,
                              self.action_shape, self.device)
+        # self.states_list = []
+        # self.p = 0
+        # self.states_list = torch.zeros((memory_size, *self.state_shape))
+        # self.states_list = np.empty(
+        #     (memory_size, *self.state_shape), dtype=np.uint8)
 
         self.model_dir = os.path.join(log_dir, 'model')
         summary_dir = os.path.join(log_dir, 'summary')
@@ -119,21 +125,20 @@ class PPG:
         self.storage.end_rolout(next_values)
 
     def update(self):
-        states_list = []
+
         for sample in self.storage.iterate():
             self.policy_update(sample)
             self.value_update(sample)
 
             states, _, pred_values, target_values, _, _ = sample
 
-            states_list.append(states.cpu())
             self.memory.append(states, target_values, pred_values)
 
         if (self.step+1) % self.aux_steps == 0:
-            # with torch.no_grad():
-            #     for i, states in enumerate(states_list):
-            #         _, pi_old = self.policy_network.get_aux(states.to(self.device))
-            #         memory.append_pi_old(pi_old)
+            with torch.no_grad():
+                for states in self.memory.state_iterate():
+                    _, pi_old = self.policy_network.get_aux(states.to(self.device))
+                    self.memory.append_pi_old(pi_old)
 
             for sample in self.memory.iterate():
                 self.aux_update(sample)
@@ -143,13 +148,16 @@ class PPG:
     def aux_update(self, sample):
         states, target_values, pi_old, pred_values = sample
 
+        # policy update
         pi_values, pi_probs = self.policy_network.get_aux(states)
-        # print(pi_probs)
-        kl = -(pi_probs.log()).mean()
+        log_pi_probs = (
+            pi_probs + (pi_probs == 0.0).float() * 1e-8
+        ).log()
+        log_pi_old = (
+            pi_old + (pi_old == 0.0).float() * 1e-8
+        ).log()
 
-        assert (kl.item() > 0), print(kl.item())
-
-        # aux_loss_values = 0.5 * (pi_values - target_values).pow(2).mean()
+        kl = (pi_old * (log_pi_old - log_pi_probs)).mean()
 
         value_pred_clipped = pred_values + (
             pi_values - pred_values
@@ -177,8 +185,6 @@ class PPG:
         value_pred_clipped = pred_values + (
             values - pred_values
         ).clamp(-self.clip_param, self.clip_param)
-
-        # loss_value = 0.5 * (values - target_values).pow(2).mean()
 
         loss_value = 0.5 * torch.max(
             (values - target_values).pow(2),
