@@ -11,6 +11,7 @@ epochs: 1
 entropy_coef: 0.01
 lambd: 0.95
 max_grad_norm: 0.5
+kl_coef: 0.0
 
 ## aux parameter ##
 aux_steps: 32

@@ -15,7 +15,8 @@ class PPG:
     def __init__(self, envs, eval_envs, device, log_dir, num_processes, eval_steps=10,
                  num_steps=10**8, batch_size=256, rollout_length=128, lr=5.e-4,
                  adam_eps=1e-5, gamma=0.999, clip_param=0.2, epochs=1, entropy_coef=0.01,
-                 lambd=0.95, max_grad_norm=0.5, aux_batch_size=16, aux_steps=32, aux_epochs=6):
+                 lambd=0.95, max_grad_norm=0.5, aux_batch_size=16, aux_steps=32, aux_epochs=6,
+                 kl_coef=0.):
 
         self.envs = envs
         self.eval_envs = eval_envs
@@ -44,14 +45,9 @@ class PPG:
         self.aux_steps = aux_steps
 
         self.memory_size = memory_size
-        self.memory = Memory(memory_size, aux_batch_size,
-                             aux_epochs, self.state_shape,
-                             self.action_shape, self.device)
-        # self.states_list = []
-        # self.p = 0
-        # self.states_list = torch.zeros((memory_size, *self.state_shape))
-        # self.states_list = np.empty(
-        #     (memory_size, *self.state_shape), dtype=np.uint8)
+        self.memory = Memory(
+            memory_size, aux_batch_size, aux_epochs,
+            self.state_shape, self.action_shape, self.device)
 
         self.model_dir = os.path.join(log_dir, 'model')
         summary_dir = os.path.join(log_dir, 'summary')
@@ -84,6 +80,8 @@ class PPG:
         self.episode_rewards = deque(maxlen=10)
         self.step = 0
         self.total_step = 0
+
+        self.kl_coef = kl_coef
 
     def run(self):
         states = self.envs.reset()
@@ -134,10 +132,11 @@ class PPG:
             self.memory.append(states, target_values, pred_values)
 
         if (self.step+1) % self.aux_steps == 0:
-            with torch.no_grad():
-                for states in self.memory.state_iterate():
-                    _, pi_old = self.policy_network.get_aux(states.to(self.device))
-                    self.memory.append_pi_old(pi_old)
+            if self.kl_coef > 0:
+                with torch.no_grad():
+                    for states in self.memory.state_iterate():
+                        _, pi_old = self.policy_network.get_aux(states.to(self.device))
+                        self.memory.append_pi_old(pi_old)
 
             for sample in self.memory.iterate():
                 self.aux_update(sample)
@@ -168,7 +167,7 @@ class PPG:
         ).mean()
 
         loss = (
-            aux_loss_values + kl
+            aux_loss_values + self.kl_coef * kl
         )
 
         self.policy_optimizer.zero_grad()
